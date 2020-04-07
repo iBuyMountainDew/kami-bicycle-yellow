@@ -30,7 +30,7 @@ public class AutoArmour extends Module {
         for (int armorType = 0; armorType < 4; armorType++) {
             ItemStack oldArmor = mc.player.inventory.armorItemInSlot(armorType);
 
-            if (oldArmor != null && oldArmor.getItem() instanceof ItemArmor)
+            if (oldArmor.getItem() instanceof ItemArmor)
                 bestArmorValues[armorType] =
                         ((ItemArmor) oldArmor.getItem()).damageReduceAmount;
 
@@ -44,12 +44,13 @@ public class AutoArmour extends Module {
             if (stack.getCount() > 1)
                 continue;
 
-            if (stack == null || !(stack.getItem() instanceof ItemArmor))
+            if (!(stack.getItem() instanceof ItemArmor))
                 continue;
 
             ItemArmor armor = (ItemArmor) stack.getItem();
             int armorType = armor.armorType.ordinal() - 2;
 
+            // armorItemInSlot counts from 1 to 4 
             if (armorType == 2 && mc.player.inventory.armorItemInSlot(armorType).getItem().equals(Items.ELYTRA))
                 continue;
 

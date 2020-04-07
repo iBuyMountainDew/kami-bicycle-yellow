@@ -59,6 +59,7 @@ public class AutoMend extends Module {
     public void onUpdate() {
         if (mc.player == null) return;
 
+        // armorInventory.get(i) counts from 0 to 3
         if (shouldMend(0) || shouldMend(1) || shouldMend(2) || shouldMend(3)) {
 
             if (autoSwitch.getValue() && (mc.player.getHeldItemMainhand().getItem() != Items.EXPERIENCE_BOTTLE)) {
