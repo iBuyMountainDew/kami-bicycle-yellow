@@ -33,7 +33,7 @@ public class ChatTimestamp extends Module {
         if (!(event.getPacket() instanceof SPacketChat)) return;
         SPacketChat sPacketChat = (SPacketChat) event.getPacket();
 
-        if (addTime(sPacketChat.getChatComponent().getUnformattedText())) {
+        if (addTime(sPacketChat.getChatComponent().getFormattedText())) {
             event.cancel();
         }
     });
@@ -41,6 +41,10 @@ public class ChatTimestamp extends Module {
     private boolean addTime(String message) {
         Command.sendRawChatMessage("<" + TimeUtil.getFinalTime(setToText(secondColour.getValue()), setToText(firstColour.getValue()), timeUnitSetting.getValue(), timeTypeSetting.getValue(), doLocale.getValue()) + TextFormatting.RESET + "> " + message);
         return true;
+    }
+
+    public String returnFormatted() {
+        return "<" + TimeUtil.getFinalTime(timeUnitSetting.getValue(), timeTypeSetting.getValue(), doLocale.getValue()) + "> ";
     }
 
     private TextFormatting setToText(ColourTextFormatting.ColourCode colourCode) {

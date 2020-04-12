@@ -2,6 +2,7 @@ package me.zeroeightsix.kami.module.modules.combat;
 
 import me.zero.alpine.listener.EventHandler;
 import me.zero.alpine.listener.Listener;
+import me.zeroeightsix.kami.event.events.GuiScreenEvent;
 import me.zeroeightsix.kami.event.events.PacketEvent;
 import me.zeroeightsix.kami.module.Module;
 import me.zeroeightsix.kami.setting.Setting;
@@ -31,17 +32,12 @@ public class OffhandGap extends Module {
 	private Setting<Boolean> swordOrAxeOnly = register(Settings.b("Sword or Axe Only", true));
 	private Setting<Boolean> preferBlocks = register(Settings.booleanBuilder("Prefer Placing Blocks").withValue(false).withVisibility(v -> !swordOrAxeOnly.getValue()).build());
 	private Setting<Boolean> crystalCheck = register(Settings.b("Crystal Check", false));
-//	private Setting<Mode> modeSetting = register(Settings.e("Use Mode", Mode.GAPPLE));
-
-//	private enum Mode {
-//		GAPPLE, FOOD, CUSTOM
-//	}
 
 	int gaps = -1;
 	boolean autoTotemWasEnabled = false;
 	boolean cancelled = false;
+	boolean isGuiOpened = false;
 	Item usedItem;
-	Item toUseItem;
 	CrystalAura crystalAura;
 
 	@EventHandler
@@ -99,7 +95,6 @@ public class OffhandGap extends Module {
 		cancelled = mc.player.getHealth() + mc.player.getAbsorptionAmount() <= disableHealth.getValue();
 		if (cancelled) { disableGaps(); return; }
 
-		toUseItem = Items.GOLDEN_APPLE;
 		if (mc.player.getHeldItemOffhand().getItem() != Items.GOLDEN_APPLE) {
 			for (int i = 0; i < 45; i++) {
 				if (mc.player.inventory.getStackInSlot(i).getItem() == Items.GOLDEN_APPLE) {
@@ -109,8 +104,6 @@ public class OffhandGap extends Module {
 			}
 		}
 	}
-
-//	private static Map<Integer, ItemStack> getFullInventory() { return getInventorySlots(0, 45); }
 
 	/* If weaponCheck is disabled, check if they're not holding an item you'd want to use normally */
 	private boolean passItemCheck() {
@@ -136,7 +129,7 @@ public class OffhandGap extends Module {
 
 	private void disableGaps() {
 		if (autoTotemWasEnabled != MODULE_MANAGER.isModuleEnabled(AutoTotem.class)) {
-			moveGapsToInventory(gaps);
+			moveGapsWaitForNoGui();
 			MODULE_MANAGER.getModule(AutoTotem.class).enable();
 			autoTotemWasEnabled = false;
 		}
@@ -155,6 +148,14 @@ public class OffhandGap extends Module {
 			mc.playerController.windowClick(0, slot < 9 ? slot + 36 : slot, 0, ClickType.PICKUP, mc.player);
 		}
 	}
+
+	private void moveGapsWaitForNoGui() {
+		if (isGuiOpened) return;
+		moveGapsToInventory(gaps);
+	}
+
+	@EventHandler
+	public Listener<GuiScreenEvent.Displayed> listener = new Listener<>(event -> isGuiOpened = event.getScreen() != null);
 
 	@Override
 	public String getHudInfo() {

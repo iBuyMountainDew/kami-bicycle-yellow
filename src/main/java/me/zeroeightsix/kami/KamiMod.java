@@ -3,6 +3,7 @@ package me.zeroeightsix.kami;
 import com.google.common.base.Converter;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import me.zero.alpine.EventBus;
 import me.zero.alpine.EventManager;
@@ -26,12 +27,12 @@ import me.zeroeightsix.kami.util.Friends;
 import me.zeroeightsix.kami.util.LagCompensator;
 import me.zeroeightsix.kami.util.RichPresence;
 import me.zeroeightsix.kami.util.Wrapper;
-import net.minecraft.client.Minecraft;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.opengl.Display;
@@ -40,6 +41,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -48,42 +50,39 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 
+import static me.zeroeightsix.kami.DiscordPresence.setCustomIcons;
+
 /**
  * Created by 086 on 7/11/2017.
  * Updated by S-B99 on 25/03/19
+ * Updated by Dewy on 09/04/2020
  */
 @Mod(
         modid = KamiMod.MODID,
         name = KamiMod.MODNAME,
-        version = KamiMod.MODVER,
-        updateJSON = KamiMod.UPDATE_JSON
+        version = KamiMod.MODVER
 )
 public class KamiMod {
 
     public static final String MODNAME = "KAMI Blue";
     public static final String MODID = "kamiblue";
-    public static final String MODVER = "v1.1.2-beta";
-    public static final String MODVERSMALL = "v1.1.2-beta";
+    public static final String MODVER = "v1.1.2-beta"; // this is changed to v1.1.2-commit for debugging during travis releases
+    public static final String MODVERSMALL = "v1.1.2-beta"; // shown to the user
+    public static final String MODVERBROAD = "v1.1.2"; // used for update checking
+
+    public static final String MCVER = "1.12.2";
+
     public static final String APP_ID = "638403216278683661";
 
-    static final String UPDATE_JSON = "https://raw.githubusercontent.com/kami-blue/assets/assets/assets/updateChecker.json";
+    private static final String UPDATE_JSON = "https://raw.githubusercontent.com/kami-blue/assets/assets/assets/updateChecker.json";
     public static final String DONATORS_JSON = "https://raw.githubusercontent.com/kami-blue/assets/assets/assets/donators.json";
     public static final String CAPES_JSON = "https://raw.githubusercontent.com/kami-blue/assets/assets/assets/capes.json";
-    public static final String GITHUB_LINK = "https://github.com/kami-blue/client/";
+    public static final String GITHUB_LINK = "https://github.com/kami-blue/";
     public static final String WEBSITE_LINK = "https://blue.bella.wtf";
 
-
-    //    public static final String KAMI_HIRAGANA = "\u304B\u307F";
-//    public static final String KAMI_KATAKANA = "\u30AB\u30DF";
     public static final String KAMI_KANJI = "\u30ab\u30df\u30d6\u30eb";
-    public static final String KAMI_BLUE = "\u1d0b\u1d00\u1d0d\u026a \u0299\u029f\u1d1c\u1d07";
-    public static final String KAMI_JAPANESE_ONTOP = "\u4e0a\u306b\u30ab\u30df\u30d6\u30eb\u30fc";
-    public static final String KAMI_ONTOP = "\u1d0b\u1d00\u1d0d\u026a \u0299\u029f\u1d1c\u1d07 \u1d0f\u0274 \u1d1b\u1d0f\u1d18";
-    public static final String KAMI_WEBSITE = "\u0299\u1d07\u029f\u029f\u1d00\u002e\u1d21\u1d1b\ua730\u002f\u1d0b\u1d00\u1d0d\u026a\u0299\u029f\u1d1c\u1d07";
     public static final char colour = '\u00A7';
     public static final char separator = '\u23d0';
-    public static final char quoteLeft = '\u00ab';
-    public static final char quoteRight = '\u00bb';
 
     private static final String KAMI_CONFIG_NAME_DEFAULT = "KAMIBlueConfig.json";
 
@@ -91,6 +90,10 @@ public class KamiMod {
 
     public static final EventBus EVENT_BUS = new EventManager();
     public static final ModuleManager MODULE_MANAGER = new ModuleManager();
+
+    public static String latest; // latest version (null if no internet or exception occurred)
+    public static boolean isLatest;
+    public static boolean hasAskedToUpdate = false;
 
     @Mod.Instance
     private static KamiMod INSTANCE;
@@ -110,55 +113,14 @@ public class KamiMod {
     }).buildAndRegister("");
 
     @Mod.EventHandler
-    public void preInit(FMLPreInitializationEvent event) { }
+    public void preInit(FMLPreInitializationEvent event) {
+        updateCheck();
+    }
 
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
-        if (RichPresence.INSTANCE.customUsers != null) {
-            for (RichPresence.CustomUser user : RichPresence.INSTANCE.customUsers) {
-                if (user.uuid.equalsIgnoreCase(Minecraft.getMinecraft().session.getProfile().getId().toString())) {
-                    switch (Integer.parseInt(user.type)) {
-                        case 0: {
-                            DiscordPresence.presence.smallImageKey = "booster";
-                            DiscordPresence.presence.smallImageText = "booster uwu";
-                            break;
-                        }
-                        case 1: {
-                            DiscordPresence.presence.smallImageKey = "inviter";
-                            DiscordPresence.presence.smallImageText = "inviter owo";
-                            break;
-                        }
-                        case 2: {
-                            DiscordPresence.presence.smallImageKey = "giveaway";
-                            DiscordPresence.presence.smallImageText = "giveaway winner";
-                            break;
-                        }
-                        case 3: {
-                            DiscordPresence.presence.smallImageKey = "contest";
-                            DiscordPresence.presence.smallImageText = "contest winner";
-                            break;
-                        }
-                        case 4: {
-                            DiscordPresence.presence.smallImageKey = "nine";
-                            DiscordPresence.presence.smallImageText = "900th member";
-                            break;
-                        }
-                        case 5: {
-                            DiscordPresence.presence.smallImageKey = "github1";
-                            DiscordPresence.presence.smallImageText = "contributor!! uwu";
-                            break;
-                        }
-                        default: {
-                            DiscordPresence.presence.smallImageKey = "donator2";
-                            DiscordPresence.presence.smallImageText = "donator <3";
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        setCustomIcons();
         Display.setTitle(MODNAME + " " + KAMI_KANJI + " " + MODVERSMALL);
-//        Display.setIcon(WindowIcon.ExtractByteBufferFromImagePath("kami.png"));
     }
 
     @Mod.EventHandler
@@ -301,5 +263,30 @@ public class KamiMod {
 
     public CommandManager getCommandManager() {
         return commandManager;
+    }
+
+    public void updateCheck() {
+        try {
+            KamiMod.log.info("Attempting KAMI Blue update check...");
+
+            JsonParser parser = new JsonParser();
+            String latestVersion = parser.parse(IOUtils.toString(new URL(UPDATE_JSON))).getAsJsonObject().getAsJsonObject("version").get(MCVER + "-latest").getAsString();
+
+            isLatest = latestVersion.equals(MODVERBROAD);
+            latest = latestVersion;
+
+            if (!isLatest) {
+                KamiMod.log.warn("You are running an outdated version of KAMI Blue.\nCurrent: " + MODVERBROAD + "\nLatest: " + latestVersion);
+
+                return;
+            }
+
+            KamiMod.log.info("Your KAMI Blue (" + MODVERBROAD + ") is up-to-date with the latest stable release.");
+        } catch (IOException e) {
+            latest = null;
+
+            KamiMod.log.error("Oes noes! An exception was thrown during the update check.");
+            e.printStackTrace();
+        }
     }
 }
